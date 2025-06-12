@@ -1,21 +1,3 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'drive.google.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-  },
-};
-
-module.exports = nextConfig;
+// This file can be deleted. Configuration is in next.config.ts.
+// Keeping it empty to ensure it doesn't interfere if somehow picked up.
+module.exports = {};

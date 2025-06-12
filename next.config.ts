@@ -2,7 +2,6 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
   images: {
     remotePatterns: [
       {
@@ -19,6 +18,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Ensure TypeScript and ESLint errors are not ignored during build.
+  // These are default to false if not specified, which is the desired behavior.
+  // typescript: {
+  //   ignoreBuildErrors: false,
+  // },
+  // eslint: {
+  //   ignoreDuringBuilds: false,
+  // },
 };
 
 export default nextConfig;
