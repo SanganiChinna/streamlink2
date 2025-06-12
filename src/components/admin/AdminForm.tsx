@@ -134,7 +134,7 @@ const AdminForm = () => {
               <p className="text-sm text-destructive">{errors.description.message}</p>
             )}
           </div>
-          <Button type="submit" className="w-full text-lg py-3" variant="primary" disabled={isSubmitting}>
+          <Button type="submit" className="w-full text-lg py-3" variant="default" disabled={isSubmitting}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
