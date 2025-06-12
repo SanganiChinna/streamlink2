@@ -25,7 +25,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body bg-background text-foreground antialiased flex flex-col min-h-screen">
+      <body className="font-body bg-background text-foreground antialiased flex flex-col min-h-screen" suppressHydrationWarning={true}>
         {/* Header component now handles its own AuthProvider internally */}
         <Header /> 
         <main className="flex-grow container mx-auto px-4 py-8">
