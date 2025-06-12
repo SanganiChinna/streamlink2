@@ -1,64 +1,63 @@
+
 "use server";
 
-import { generateVideoDescription, type GenerateVideoDescriptionInput } from "@/ai/flows/generate-video-descriptions";
-import { searchVideos, type VideoSearchInput } from "@/ai/flows/video-search";
+import { db } from "@/lib/firebase";
+import { collection, doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, limit } from "firebase/firestore";
 import type { Video } from "@/lib/types";
+import { extractGoogleDriveFileId } from "@/lib/utils";
 
-export async function generateVideoDetailsAction(fileId: string, originalLink: string): Promise<Omit<Video, 'createdAt'>> {
-  try {
-    // For the AI, we'll use a generic title based on the fileId.
-    // In a real app, you might try to get a filename or let user input title.
-    const genericTitle = `Video: ${fileId}`;
-    
-    const descriptionInput: GenerateVideoDescriptionInput = {
-      videoTitle: genericTitle,
-    };
-    const descriptionOutput = await generateVideoDescription(descriptionInput);
-
-    return {
-      id: fileId,
-      googleDriveFileId: fileId,
-      title: genericTitle, // Use the generic title for now
-      description: descriptionOutput.description,
-      thumbnailUrl: `https://drive.google.com/thumbnail?id=${fileId}`,
-      originalLink: originalLink,
-    };
-  } catch (error) {
-    console.error("Error generating video details:", error);
-    // Fallback if AI fails
-    return {
-      id: fileId,
-      googleDriveFileId: fileId,
-      title: `Video: ${fileId}`,
-      description: "No description available.",
-      thumbnailUrl: `https://drive.google.com/thumbnail?id=${fileId}`,
-      originalLink: originalLink,
-    };
-  }
+interface AddVideoData {
+  googleDriveLink: string;
+  title: string;
+  description: string;
 }
 
-export async function searchLibraryVideosAction(query: string, videos: Video[]): Promise<string[]> {
-  if (!query.trim()) {
-    return videos.map(v => v.title); // Return all titles if query is empty
+export async function addVideoToLibraryAction(
+  data: AddVideoData
+): Promise<{ success: boolean; videoId?: string; error?: string; message?: string }> {
+  const { googleDriveLink, title, description } = data;
+
+  const fileId = extractGoogleDriveFileId(googleDriveLink);
+
+  if (!fileId) {
+    return { success: false, error: "Invalid Google Drive link format." };
   }
 
   try {
-    const videoTitles = videos.map(v => v.title);
-    const videoDescriptions = videos.map(v => v.description);
+    // Check if video already exists
+    const videosCollectionRef = collection(db, "videos");
+    const q = query(videosCollectionRef, where("googleDriveFileId", "==", fileId), limit(1));
+    const querySnapshot = await getDocs(q);
 
-    const searchInput: VideoSearchInput = {
-      query,
-      videoTitles,
-      videoDescriptions,
+    if (!querySnapshot.empty) {
+      return { success: false, message: "This video already exists in the library.", videoId: querySnapshot.docs[0].id };
+    }
+
+    const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}`;
+
+    const newVideoData: Omit<Video, "createdAt"> = {
+      id: fileId, // Using googleDriveFileId as the document ID
+      googleDriveFileId: fileId,
+      title,
+      description,
+      thumbnailUrl,
+      originalLink: googleDriveLink,
     };
-    const searchOutput = await searchVideos(searchInput);
-    return searchOutput; // This is an array of matching video titles
+
+    // Use googleDriveFileId as the document ID in Firestore
+    const videoDocRef = doc(db, "videos", fileId);
+    await setDoc(videoDocRef, {
+      ...newVideoData,
+      createdAt: serverTimestamp(),
+    });
+
+    return { success: true, videoId: fileId, message: `Video "${title}" added successfully.` };
   } catch (error) {
-    console.error("Error searching videos:", error);
-    // Fallback: simple text search if AI fails
-    const lowerQuery = query.toLowerCase();
-    return videos
-      .filter(v => v.title.toLowerCase().includes(lowerQuery) || v.description.toLowerCase().includes(lowerQuery))
-      .map(v => v.title);
+    console.error("Error adding video to Firestore:", error);
+    let errorMessage = "Failed to add video.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { success: false, error: errorMessage };
   }
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -6,25 +7,25 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import useLocalStorage from "@/hooks/useLocalStorage";
-import type { Video } from "@/lib/types";
 import { extractGoogleDriveFileId } from "@/lib/utils";
-import { generateVideoDetailsAction } from "@/app/actions";
+import { addVideoToLibraryAction } from "@/app/actions";
 import { PlusCircle, Loader2 } from "lucide-react";
 
 const formSchema = z.object({
   googleDriveLink: z.string().url({ message: "Please enter a valid URL." })
     .refine(extractGoogleDriveFileId, { message: "Invalid Google Drive link format." }),
+  title: z.string().min(1, { message: "Title is required." }).max(150, { message: "Title cannot exceed 150 characters."}),
+  description: z.string().max(5000, { message: "Description cannot exceed 5000 characters."}).optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
 const AdminForm = () => {
   const { toast } = useToast();
-  const [videos, setVideos] = useLocalStorage<Video[]>("videos", []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -34,51 +35,47 @@ const AdminForm = () => {
     reset,
   } = useForm<FormData>({
     resolver: zodResolver(formSchema),
+    defaultValues: {
+      description: "", // Ensure description is initialized for optional field
+    }
   });
 
   const onSubmit: SubmitHandler<FormData> = async (data) => {
     setIsSubmitting(true);
-    const fileId = extractGoogleDriveFileId(data.googleDriveLink);
-
-    if (!fileId) {
-      toast({
-        title: "Error",
-        description: "Could not extract File ID from the link.",
-        variant: "destructive",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (videos.some(v => v.id === fileId)) {
-      toast({
-        title: "Info",
-        description: "This video already exists in the library.",
-        variant: "default",
-      });
-      setIsSubmitting(false);
-      reset();
-      return;
-    }
-
+    
     try {
-      const videoDetails = await generateVideoDetailsAction(fileId, data.googleDriveLink);
-      const newVideo: Video = {
-        ...videoDetails,
-        createdAt: Date.now(),
-      };
-      
-      setVideos((prevVideos) => [...prevVideos, newVideo].sort((a,b) => b.createdAt - a.createdAt));
-      toast({
-        title: "Success!",
-        description: `Video "${videoDetails.title}" added to library.`,
+      const result = await addVideoToLibraryAction({
+        googleDriveLink: data.googleDriveLink,
+        title: data.title,
+        description: data.description || "No description provided.", // Provide default if empty
       });
-      reset();
+
+      if (result.success) {
+        toast({
+          title: "Success!",
+          description: result.message || `Video "${data.title}" added to library.`,
+        });
+        reset();
+      } else if (result.message) { // Video already exists
+         toast({
+          title: "Info",
+          description: result.message,
+          variant: "default",
+        });
+        reset(); // Also reset if video already exists
+      }
+      else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to add video. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Error adding video:", error);
       toast({
         title: "Error",
-        description: "Failed to add video. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -94,7 +91,7 @@ const AdminForm = () => {
           Add New Video
         </CardTitle>
         <CardDescription>
-          Enter a Google Drive video link to add it to the StreamLink library.
+          Enter a Google Drive video link, title, and description to add it to the StreamLink library.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -110,6 +107,31 @@ const AdminForm = () => {
             />
             {errors.googleDriveLink && (
               <p className="text-sm text-destructive">{errors.googleDriveLink.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-lg">Title</Label>
+            <Input
+              id="title"
+              type="text"
+              placeholder="Enter video title"
+              {...register("title")}
+              className={`bg-input text-foreground placeholder:text-muted-foreground ${errors.title ? "border-destructive focus:ring-destructive" : ""}`}
+            />
+            {errors.title && (
+              <p className="text-sm text-destructive">{errors.title.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-lg">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              placeholder="Enter video description"
+              {...register("description")}
+              className={`bg-input text-foreground placeholder:text-muted-foreground min-h-[100px] ${errors.description ? "border-destructive focus:ring-destructive" : ""}`}
+            />
+            {errors.description && (
+              <p className="text-sm text-destructive">{errors.description.message}</p>
             )}
           </div>
           <Button type="submit" className="w-full text-lg py-3" variant="primary" disabled={isSubmitting}>

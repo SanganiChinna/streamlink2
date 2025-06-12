@@ -1,12 +1,14 @@
-"use client"; // Required for useLocalStorage and client-side data fetching
+
+"use client";
 
 import { useEffect, useState } from 'react';
 import VideoPlayer from '@/components/video/VideoPlayer';
-import useLocalStorage from '@/hooks/useLocalStorage';
 import type { Video } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Loader2 } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
 
 interface WatchPageParams {
   params: {
@@ -16,13 +18,32 @@ interface WatchPageParams {
 
 export default function WatchPage({ params }: WatchPageParams) {
   const { videoId } = params;
-  const [videos] = useLocalStorage<Video[]>("videos", []);
   const [video, setVideo] = useState<Video | null | undefined>(undefined); // undefined for loading state
 
   useEffect(() => {
-    const foundVideo = videos.find(v => v.googleDriveFileId === videoId);
-    setVideo(foundVideo || null);
-  }, [videos, videoId]);
+    if (!videoId) return;
+
+    const fetchVideo = async () => {
+      try {
+        const videoDocRef = doc(db, "videos", videoId);
+        const videoSnap = await getDoc(videoDocRef);
+
+        if (videoSnap.exists()) {
+          const data = videoSnap.data();
+           // Ensure createdAt is a Firestore Timestamp. If it's not (e.g. from older data), convert.
+          const createdAt = data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.fromDate(new Date(data.createdAt?.seconds ? data.createdAt.seconds * 1000 : Date.now()));
+          setVideo({ ...data, id: videoSnap.id, createdAt } as Video);
+        } else {
+          setVideo(null); // Video not found
+        }
+      } catch (error) {
+        console.error("Error fetching video:", error);
+        setVideo(null); // Error state
+      }
+    };
+
+    fetchVideo();
+  }, [videoId]);
 
   if (video === undefined) {
     return (
@@ -38,7 +59,7 @@ export default function WatchPage({ params }: WatchPageParams) {
       <div className="text-center py-10">
         <h1 className="font-headline text-3xl text-destructive mb-4">Video Not Found</h1>
         <p className="text-lg text-muted-foreground mb-6">
-          The video you are looking for does not exist or has been removed.
+          The video you are looking for (ID: {videoId}) does not exist or has been removed.
         </p>
         <Button asChild variant="primary">
           <Link href="/">
