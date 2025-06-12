@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ const SearchBar = ({ searchTerm, onSearchTermChange, onSearchSubmit }: SearchBar
         className="bg-input text-foreground placeholder:text-muted-foreground flex-grow"
         aria-label="Search videos"
       />
-      <Button type="submit" variant="primary" size="icon" aria-label="Submit search">
+      <Button type="submit" variant="default" size="icon" aria-label="Submit search">
         <Search className="h-5 w-5" />
       </Button>
     </form>
