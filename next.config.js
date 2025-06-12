@@ -1,1 +1,3 @@
-// This file is intentionally left empty to ensure next.config.ts is used.
+// This file is intentionally left empty.
+// The Next.js configuration is managed in next.config.ts.
+// This file can be safely deleted.
