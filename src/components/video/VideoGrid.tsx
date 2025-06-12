@@ -24,15 +24,38 @@ const VideoGrid = () => {
       const querySnapshot = await getDocs(q);
       const videosData = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Ensure createdAt is a Firestore Timestamp. If it's not (e.g. from older data), convert.
-        // Firestore SDK usually returns Timestamp objects directly.
-        const createdAt = data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.fromDate(new Date(data.createdAt?.seconds ? data.createdAt.seconds * 1000 : Date.now()));
-        return { ...data, id: doc.id, createdAt } as Video;
+        let createdAtString: string;
+
+        if (data.createdAt instanceof Timestamp) {
+          createdAtString = data.createdAt.toDate().toISOString();
+        } else if (data.createdAt && typeof data.createdAt.seconds === 'number' && typeof data.createdAt.nanoseconds === 'number') {
+          createdAtString = new Timestamp(data.createdAt.seconds, data.createdAt.nanoseconds).toDate().toISOString();
+        } else if (typeof data.createdAt === 'string') {
+           try {
+            createdAtString = new Date(data.createdAt).toISOString();
+          } catch (e) {
+            console.warn(`Invalid date string for createdAt: ${data.createdAt} on video ${doc.id}. Falling back.`);
+            createdAtString = new Date().toISOString();
+          }
+        } else {
+          console.warn(`Missing or invalid createdAt for video ${doc.id}. Falling back to current time.`);
+          createdAtString = new Date().toISOString();
+        }
+        
+        return {
+          id: doc.id,
+          title: data.title || 'Untitled Video',
+          description: data.description || 'No description available.',
+          thumbnailUrl: data.thumbnailUrl || '',
+          googleDriveFileId: data.googleDriveFileId || '',
+          originalLink: data.originalLink || '',
+          createdAt: createdAtString,
+        } as Video;
       });
       setAllVideos(videosData);
     } catch (error) {
       console.error("Error fetching videos from Firestore:", error);
-      setAllVideos([]); // Set to empty array on error
+      setAllVideos([]); 
     } finally {
       setIsLoading(false);
     }
@@ -40,7 +63,7 @@ const VideoGrid = () => {
   
   const filterVideos = useCallback((term: string) => {
     if (!term.trim()) {
-      setDisplayedVideos(allVideos); // Sort handled by initial fetch
+      setDisplayedVideos(allVideos); 
     } else {
       const lowerSearchTerm = term.toLowerCase();
       const filtered = allVideos.filter(
@@ -57,19 +80,16 @@ const VideoGrid = () => {
   }, [fetchVideos]);
 
   useEffect(() => {
-    // Handle initial search term from URL query params
     const queryParamSearch = searchParams?.get('q');
     if (queryParamSearch) {
       setCurrentSearchTerm(queryParamSearch);
-      // Videos might not be loaded yet, filter will be applied once allVideos is populated
     }
   }, [searchParams]);
   
   useEffect(() => {
-    // Apply filter whenever allVideos or currentSearchTerm changes
     if (allVideos.length > 0) {
         filterVideos(currentSearchTerm);
-    } else if (!isLoading) { // If not loading and no videos, displayed should be empty
+    } else if (!isLoading) { 
         setDisplayedVideos([]);
     }
   }, [allVideos, currentSearchTerm, filterVideos, isLoading]);

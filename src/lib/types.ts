@@ -8,5 +8,5 @@ export interface Video {
   thumbnailUrl: string;
   googleDriveFileId: string;
   originalLink: string;
-  createdAt: Timestamp;
+  createdAt: string; // Changed from Timestamp to string (ISO string)
 }

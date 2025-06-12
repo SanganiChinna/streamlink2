@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation'; // Import useParams
+import { useParams } from 'next/navigation';
 import VideoPlayer from '@/components/video/VideoPlayer';
 import type { Video } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -11,18 +11,11 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 
-// WatchPageParams interface is no longer needed as params are accessed via hook
-// interface WatchPageParams {
-//   params: {
-//     videoId: string;
-//   };
-// }
-
 export default function WatchPage() {
-  const params = useParams<{ videoId: string }>(); // Use the hook
-  const videoId = params.videoId; // Extract videoId from hook's return value
+  const params = useParams<{ videoId: string }>(); 
+  const videoId = params.videoId; 
 
-  const [video, setVideo] = useState<Video | null | undefined>(undefined); // undefined for loading state
+  const [video, setVideo] = useState<Video | null | undefined>(undefined);
 
   useEffect(() => {
     if (!videoId) return;
@@ -34,20 +27,44 @@ export default function WatchPage() {
 
         if (videoSnap.exists()) {
           const data = videoSnap.data();
-           // Ensure createdAt is a Firestore Timestamp. If it's not (e.g. from older data), convert.
-          const createdAt = data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.fromDate(new Date(data.createdAt?.seconds ? data.createdAt.seconds * 1000 : Date.now()));
-          setVideo({ ...data, id: videoSnap.id, createdAt } as Video);
+          let createdAtString: string;
+
+          if (data.createdAt instanceof Timestamp) {
+            createdAtString = data.createdAt.toDate().toISOString();
+          } else if (data.createdAt && typeof data.createdAt.seconds === 'number' && typeof data.createdAt.nanoseconds === 'number') {
+            createdAtString = new Timestamp(data.createdAt.seconds, data.createdAt.nanoseconds).toDate().toISOString();
+          } else if (typeof data.createdAt === 'string') {
+            try {
+              createdAtString = new Date(data.createdAt).toISOString();
+            } catch (e) {
+              console.warn(`Invalid date string for createdAt: ${data.createdAt} on video ${videoSnap.id}. Falling back.`);
+              createdAtString = new Date().toISOString();
+            }
+          } else {
+            console.warn(`Missing or invalid createdAt for video ${videoSnap.id}. Falling back to current time.`);
+            createdAtString = new Date().toISOString();
+          }
+
+          setVideo({
+            id: videoSnap.id,
+            title: data.title || 'Untitled Video',
+            description: data.description || 'No description available.',
+            thumbnailUrl: data.thumbnailUrl || '',
+            googleDriveFileId: data.googleDriveFileId || '',
+            originalLink: data.originalLink || '',
+            createdAt: createdAtString,
+          } as Video);
         } else {
-          setVideo(null); // Video not found
+          setVideo(null); 
         }
       } catch (error) {
         console.error("Error fetching video:", error);
-        setVideo(null); // Error state
+        setVideo(null); 
       }
     };
 
     fetchVideo();
-  }, [videoId]); // videoId from useParams is stable for the route, so this dependency is correct
+  }, [videoId]);
 
   if (video === undefined) {
     return (

@@ -34,7 +34,8 @@ export async function addVideoToLibraryAction(
 
     const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}`;
 
-    const newVideoData: Omit<Video, "createdAt" | "id"> = { // id will be same as fileId
+    // createdAt will be handled by serverTimestamp during setDoc
+    const newVideoData: Omit<Video, "createdAt" | "id"> = { 
       googleDriveFileId: fileId,
       title,
       description,
@@ -45,8 +46,8 @@ export async function addVideoToLibraryAction(
     const videoDocRef = doc(db, "videos", fileId);
     await setDoc(videoDocRef, {
       ...newVideoData,
-      id: fileId, // Explicitly set id field in document
-      createdAt: serverTimestamp(),
+      id: fileId, 
+      createdAt: serverTimestamp(), // Firestore handles this server-side
     });
 
     return { success: true, videoId: fileId, message: `Video "${title}" added successfully.` };
@@ -83,10 +84,35 @@ export async function getVideosAction(): Promise<{ videos: Video[]; error?: stri
     const videosCollectionRef = collection(db, "videos");
     const q = query(videosCollectionRef, orderBy("createdAt", "desc"));
     const querySnapshot = await getDocs(q);
-    const videosData = querySnapshot.docs.map(doc => {
-      const data = doc.data();
-      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.fromDate(new Date(data.createdAt?.seconds ? data.createdAt.seconds * 1000 : Date.now()));
-      return { ...data, id: doc.id, createdAt } as Video;
+    const videosData = querySnapshot.docs.map(docInstance => {
+      const data = docInstance.data();
+      let createdAtString: string;
+
+      if (data.createdAt instanceof Timestamp) {
+        createdAtString = data.createdAt.toDate().toISOString();
+      } else if (data.createdAt && typeof data.createdAt.seconds === 'number' && typeof data.createdAt.nanoseconds === 'number') {
+        createdAtString = new Timestamp(data.createdAt.seconds, data.createdAt.nanoseconds).toDate().toISOString();
+      } else if (typeof data.createdAt === 'string') {
+        try {
+          createdAtString = new Date(data.createdAt).toISOString();
+        } catch (e) {
+          console.warn(`Invalid date string for createdAt: ${data.createdAt} on video ${docInstance.id}. Falling back.`);
+          createdAtString = new Date().toISOString();
+        }
+      } else {
+        console.warn(`Missing or invalid createdAt for video ${docInstance.id}. Falling back to current time.`);
+        createdAtString = new Date().toISOString();
+      }
+      
+      return {
+        id: docInstance.id,
+        title: data.title || 'Untitled Video',
+        description: data.description || 'No description available.',
+        thumbnailUrl: data.thumbnailUrl || '',
+        googleDriveFileId: data.googleDriveFileId || '',
+        originalLink: data.originalLink || '',
+        createdAt: createdAtString,
+      } as Video;
     });
     return { videos: videosData };
   } catch (error) {
