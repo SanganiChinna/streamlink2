@@ -65,7 +65,7 @@ export default function WatchPage() {
         <p className="text-lg text-muted-foreground mb-6">
           The video you are looking for (ID: {videoId}) does not exist or has been removed.
         </p>
-        <Button asChild variant="primary">
+        <Button asChild variant="default">
           <Link href="/">
             <ArrowLeft className="mr-2 h-5 w-5" />
             Back to Library
