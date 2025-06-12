@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation'; // Import useParams
 import VideoPlayer from '@/components/video/VideoPlayer';
 import type { Video } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -10,14 +11,17 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 
-interface WatchPageParams {
-  params: {
-    videoId: string;
-  };
-}
+// WatchPageParams interface is no longer needed as params are accessed via hook
+// interface WatchPageParams {
+//   params: {
+//     videoId: string;
+//   };
+// }
 
-export default function WatchPage({ params }: WatchPageParams) {
-  const { videoId } = params;
+export default function WatchPage() {
+  const params = useParams<{ videoId: string }>(); // Use the hook
+  const videoId = params.videoId; // Extract videoId from hook's return value
+
   const [video, setVideo] = useState<Video | null | undefined>(undefined); // undefined for loading state
 
   useEffect(() => {
@@ -43,7 +47,7 @@ export default function WatchPage({ params }: WatchPageParams) {
     };
 
     fetchVideo();
-  }, [videoId]);
+  }, [videoId]); // videoId from useParams is stable for the route, so this dependency is correct
 
   if (video === undefined) {
     return (
