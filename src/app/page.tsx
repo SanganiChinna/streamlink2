@@ -1,4 +1,13 @@
-import VideoGrid from '@/components/video/VideoGrid';
+
+"use client"; // Add this directive
+
+import dynamic from 'next/dynamic';
+import VideoGridLoading from '@/components/video/VideoGridLoading';
+
+const VideoGrid = dynamic(() => import('@/components/video/VideoGrid'), {
+  ssr: false,
+  loading: () => <VideoGridLoading />,
+});
 
 export default function HomePage() {
   return (
