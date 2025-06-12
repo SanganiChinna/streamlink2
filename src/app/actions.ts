@@ -2,7 +2,7 @@
 "use server";
 
 import { db } from "@/lib/firebase";
-import { collection, doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, limit } from "firebase/firestore";
+import { collection, doc, getDoc, setDoc, serverTimestamp, query, where, getDocs, limit, deleteDoc, orderBy, Timestamp } from "firebase/firestore";
 import type { Video } from "@/lib/types";
 import { extractGoogleDriveFileId } from "@/lib/utils";
 
@@ -24,7 +24,6 @@ export async function addVideoToLibraryAction(
   }
 
   try {
-    // Check if video already exists
     const videosCollectionRef = collection(db, "videos");
     const q = query(videosCollectionRef, where("googleDriveFileId", "==", fileId), limit(1));
     const querySnapshot = await getDocs(q);
@@ -35,8 +34,7 @@ export async function addVideoToLibraryAction(
 
     const thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}`;
 
-    const newVideoData: Omit<Video, "createdAt"> = {
-      id: fileId, // Using googleDriveFileId as the document ID
+    const newVideoData: Omit<Video, "createdAt" | "id"> = { // id will be same as fileId
       googleDriveFileId: fileId,
       title,
       description,
@@ -44,10 +42,10 @@ export async function addVideoToLibraryAction(
       originalLink: googleDriveLink,
     };
 
-    // Use googleDriveFileId as the document ID in Firestore
     const videoDocRef = doc(db, "videos", fileId);
     await setDoc(videoDocRef, {
       ...newVideoData,
+      id: fileId, // Explicitly set id field in document
       createdAt: serverTimestamp(),
     });
 
@@ -59,5 +57,40 @@ export async function addVideoToLibraryAction(
       errorMessage = error.message;
     }
     return { success: false, error: errorMessage };
+  }
+}
+
+export async function deleteVideoAction(videoId: string): Promise<{ success: boolean; error?: string; message?: string }> {
+  if (!videoId) {
+    return { success: false, error: "Video ID is required." };
+  }
+  try {
+    const videoDocRef = doc(db, "videos", videoId);
+    await deleteDoc(videoDocRef);
+    return { success: true, message: "Video deleted successfully." };
+  } catch (error) {
+    console.error("Error deleting video from Firestore:", error);
+    let errorMessage = "Failed to delete video.";
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { success: false, error: errorMessage };
+  }
+}
+
+export async function getVideosAction(): Promise<{ videos: Video[]; error?: string }> {
+  try {
+    const videosCollectionRef = collection(db, "videos");
+    const q = query(videosCollectionRef, orderBy("createdAt", "desc"));
+    const querySnapshot = await getDocs(q);
+    const videosData = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      const createdAt = data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.fromDate(new Date(data.createdAt?.seconds ? data.createdAt.seconds * 1000 : Date.now()));
+      return { ...data, id: doc.id, createdAt } as Video;
+    });
+    return { videos: videosData };
+  } catch (error) {
+    console.error("Error fetching videos from Firestore:", error);
+    return { videos: [], error: "Failed to fetch videos." };
   }
 }

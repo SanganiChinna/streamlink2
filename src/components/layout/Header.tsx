@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -6,14 +7,17 @@ import SearchBar from '@/components/common/SearchBar';
 import { Button } from '@/components/ui/button';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useAuth, AuthProvider } from '@/contexts/AuthContext'; // Import useAuth and AuthProvider
+import { LogOut } from 'lucide-react';
 
-const Header = () => {
+// To use useAuth, HeaderContent needs to be a child of AuthProvider
+const HeaderContent = () => {
   const router = useRouter();
   const pathname = usePathname();
   const [searchTerm, setSearchTerm] = useState('');
+  const { isAuthenticated, logout, isLoading } = useAuth(); // isLoading can be used if needed
 
   useEffect(() => {
-    // Clear search term when navigating away from home
     if (pathname !== '/') {
       setSearchTerm('');
     }
@@ -23,10 +27,14 @@ const Header = () => {
     if (pathname !== '/') {
       router.push(`/?q=${encodeURIComponent(searchTerm)}`);
     } else {
-      // If already on homepage, let homepage handle search state internally
       const event = new CustomEvent('searchSubmit', { detail: searchTerm });
       window.dispatchEvent(event);
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push('/'); // Redirect to home page after logout
   };
   
   const showSearchBar = pathname === '/' || pathname?.startsWith('/watch');
@@ -43,18 +51,45 @@ const Header = () => {
               onSearchSubmit={handleSearchSubmit}
             />
           )}
-          <nav className="space-x-2">
+          <nav className="space-x-2 flex items-center">
             <Button variant="ghost" asChild className="text-foreground hover:text-accent hover:bg-transparent transition-colors duration-300">
               <Link href="/">Home</Link>
             </Button>
-            <Button variant="ghost" asChild className="text-foreground hover:text-accent hover:bg-transparent transition-colors duration-300">
-              <Link href="/admin">Admin</Link>
-            </Button>
+            {!isAuthenticated && ( // Show Admin link only if not authenticated
+              <Button variant="ghost" asChild className="text-foreground hover:text-accent hover:bg-transparent transition-colors duration-300">
+                <Link href="/admin">Admin</Link>
+              </Button>
+            )}
+            {isAuthenticated && ( // Show Admin link as a direct path if authenticated, and Logout button
+              <>
+                <Button variant="ghost" asChild className="text-foreground hover:text-accent hover:bg-transparent transition-colors duration-300">
+                  <Link href="/admin">Admin Panel</Link>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={handleLogout} 
+                  className="text-foreground hover:text-destructive hover:bg-transparent transition-colors duration-300"
+                  aria-label="Logout"
+                >
+                  <LogOut className="mr-1 h-5 w-5" /> Logout
+                </Button>
+              </>
+            )}
           </nav>
         </div>
       </div>
     </header>
   );
+}
+
+// Wrap HeaderContent with AuthProvider so useAuth can be used
+const Header = () => {
+  return (
+    <AuthProvider>
+      <HeaderContent />
+    </AuthProvider>
+  );
 };
+
 
 export default Header;
